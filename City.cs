@@ -9,28 +9,21 @@ namespace sc2test
         public static int MAX_SIZE = 128;
 
         public string name;
-        public byte[][] altitude;
-        public byte[][] terrain;
-        public byte[][] buildings;
+
+        public Tile[][] tiles;
+
+        public int[] miscData = new int[1200];
 
         public City()
         {
-            altitude = new byte[MAX_SIZE][];
+            tiles = new Tile[MAX_SIZE][];
             for (int i = 0; i < MAX_SIZE; i++)
             {
-                altitude[i] = new byte[MAX_SIZE];
-            }
-
-            terrain = new byte[MAX_SIZE][];
-            for (int i = 0; i < MAX_SIZE; i++)
-            {
-                terrain[i] = new byte[MAX_SIZE];
-            }
-
-            buildings = new byte[MAX_SIZE][];
-            for (int i = 0; i < MAX_SIZE; i++)
-            {
-                buildings[i] = new byte[MAX_SIZE];
+                tiles[i] = new Tile[MAX_SIZE];
+                for (int j = 0; j < MAX_SIZE; j++)
+                {
+                    tiles[i][j] = new Tile();
+                }
             }
         }
     }

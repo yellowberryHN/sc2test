@@ -8,11 +8,19 @@ namespace sc2test
 {
     class Program
     {
+        public static int buildingCount;
+        public static bool includeTrees = true;
+
         static void Main(string[] args)
         {
             City city = new City();
 
             string filename = args.Length > 0 ? args[0] : "test.sc2";
+
+#if DEBUG
+            // dumb and bad.
+            filename = string.Concat("../../../cities/", filename);
+#endif
 
             var rawStream = new MemoryStream();
             using (var fs = File.OpenRead(filename))
@@ -38,6 +46,7 @@ namespace sc2test
             }
 
             Console.WriteLine("City name: {0}", city.name);
+            Console.WriteLine("Building count: {0}", buildingCount);
         }
 
         public static void ParseChunk(City city, BinaryReader reader)
@@ -57,9 +66,13 @@ namespace sc2test
                     city.name = Encoding.ASCII.GetString(buffer, 0, size < 0 ? cnamLen : size);
                     break;
                 case "MISC": // Misc Data
-                    using (var rleReader = new BinaryReader(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
                     {
-                        Console.WriteLine(BitConverter.ToString(rleReader.ReadBytes((int)rleReader.BaseStream.Length)));
+                        for (int i = 0; i < city.miscData.Length; i++)
+                        {
+                            city.miscData[i] = rleReader.ReadInt32();
+                        }
+                        //Console.WriteLine(string.Join(", ", city.miscData));
                     }
                     break;
                 case "ALTM": // Altitude
@@ -68,32 +81,87 @@ namespace sc2test
                         for (int x = 0; x < City.MAX_SIZE; x++)
                         {
                             var altmRaw = reader.ReadBytes(2);
-                            city.altitude[y][x] = (byte)(altmRaw[1] & 0x1f);
+                            city.tiles[y][x].altitude = (byte)(altmRaw[1] & 0x1f);
                         }
                     }
                     break;
                 case "XTER": // Terrain Data
-                    using (var rleReader = new BinaryReader(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
                     {
                         for (int y = 0; y < City.MAX_SIZE; y++)
                         {
                             for (int x = 0; x < City.MAX_SIZE; x++)
                             {
-                                city.terrain[y][x] = rleReader.ReadByte();
+                                city.tiles[y][x].terrain = rleReader.ReadByte();
                             }
                         }
                     }
                     break;
                 case "XBLD": // Buildings
-                    using (var rleReader = new BinaryReader(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
                     {
                         for (int y = 0; y < City.MAX_SIZE; y++)
                         {
                             for (int x = 0; x < City.MAX_SIZE; x++)
                             {
-                                city.buildings[y][x] = rleReader.ReadByte();
+                                byte building = rleReader.ReadByte();
+                                city.tiles[y][x].building = building;
+                                if (building >= 0x0D || (includeTrees && building != 0x00))
+                                {
+                                    //Console.Write("{0:X2}|", city.buildings[y][x]);
+                                    buildingCount++;
+                                }
                             }
                         }
+                    }
+                    break;
+                case "XZON": // Zoning
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    {
+                        //Console.WriteLine("XZON decomp: {0}", rleReader.BaseStream.Length);
+                        for (int y = 0; y < City.MAX_SIZE; y++)
+                        {
+                            for (int x = 0; x < City.MAX_SIZE; x++)
+                            {
+                                var zoneRaw = rleReader.ReadByte();
+                                city.tiles[y][x].corners = (Tile.Corners)(zoneRaw & 0xf0);
+                                city.tiles[y][x].zone = (Tile.Zone)(zoneRaw & 0xf);
+
+                                //Console.WriteLine("Corners: {0}, Zone: {1}", city.tiles[y][x].corners, city.tiles[y][x].zone);
+                            }
+                        }
+                    }
+                    break;
+                case "XUND": // Underground
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    {
+                        for (int y = 0; y < City.MAX_SIZE; y++)
+                        {
+                            for (int x = 0; x < City.MAX_SIZE; x++)
+                            {
+                                byte underground = rleReader.ReadByte();
+                                city.tiles[y][x].underground = underground;
+                            }
+                        }
+                    }
+                    break;
+                case "XTXT":
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    {
+                        for (int y = 0; y < City.MAX_SIZE; y++)
+                        {
+                            for (int x = 0; x < City.MAX_SIZE; x++)
+                            {
+                                byte textLabel = rleReader.ReadByte();
+                                city.tiles[y][x].textLabel = textLabel;
+                            }
+                        }
+                    }
+                    break;
+                case "XLAB":
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    {
+                        Console.WriteLine(BitConverter.ToString(rleReader.ReadBytes((int)rleReader.BaseStream.Length)).Replace('-', ' '));
                     }
                     break;
                 default:
