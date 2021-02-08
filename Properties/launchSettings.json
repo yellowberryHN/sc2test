@@ -2,7 +2,7 @@
   "profiles": {
     "sc2test": {
       "commandName": "Project",
-      "commandLineArgs": "chicago.sc2"
+      "commandLineArgs": "test.sc2"
     }
   }
 }

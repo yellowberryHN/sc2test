@@ -54,20 +54,21 @@ namespace sc2test
             string chunkId = Encoding.ASCII.GetString(reader.ReadBytes(4));
             int chunkLen = reader.ReadInt32();
 
-            Console.WriteLine("{0}: {1} bytes raw", chunkId, chunkLen);
+            Console.WriteLine("{0} raw: {1}", chunkId, chunkLen);
             
             switch (chunkId)
             {
                 case "CNAM": // City Name
-                    var cnamLen = reader.Read();
+                    var cnamLen = reader.ReadByte();
                     byte[] buffer = new byte[cnamLen];
                     reader.Read(buffer, 0, cnamLen);
                     var size = Array.IndexOf(buffer, (byte)0);
                     city.name = Encoding.ASCII.GetString(buffer, 0, size < 0 ? cnamLen : size);
                     break;
                 case "MISC": // Misc Data
-                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
                     {
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
                         for (int i = 0; i < city.miscData.Length; i++)
                         {
                             city.miscData[i] = rleReader.ReadInt32();
@@ -86,8 +87,9 @@ namespace sc2test
                     }
                     break;
                 case "XTER": // Terrain Data
-                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
                     {
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
                         for (int y = 0; y < City.MAX_SIZE; y++)
                         {
                             for (int x = 0; x < City.MAX_SIZE; x++)
@@ -98,8 +100,9 @@ namespace sc2test
                     }
                     break;
                 case "XBLD": // Buildings
-                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
                     {
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
                         for (int y = 0; y < City.MAX_SIZE; y++)
                         {
                             for (int x = 0; x < City.MAX_SIZE; x++)
@@ -116,9 +119,9 @@ namespace sc2test
                     }
                     break;
                 case "XZON": // Zoning
-                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
                     {
-                        //Console.WriteLine("XZON decomp: {0}", rleReader.BaseStream.Length);
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
                         for (int y = 0; y < City.MAX_SIZE; y++)
                         {
                             for (int x = 0; x < City.MAX_SIZE; x++)
@@ -133,8 +136,9 @@ namespace sc2test
                     }
                     break;
                 case "XUND": // Underground
-                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
                     {
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
                         for (int y = 0; y < City.MAX_SIZE; y++)
                         {
                             for (int x = 0; x < City.MAX_SIZE; x++)
@@ -146,8 +150,9 @@ namespace sc2test
                     }
                     break;
                 case "XTXT":
-                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
                     {
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
                         for (int y = 0; y < City.MAX_SIZE; y++)
                         {
                             for (int x = 0; x < City.MAX_SIZE; x++)
@@ -159,9 +164,32 @@ namespace sc2test
                     }
                     break;
                 case "XLAB":
-                    using (var rleReader = new BinaryReaderBE(new MemoryStream(unRLE(reader.ReadBytes(chunkLen)))))
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
                     {
-                        Console.WriteLine(BitConverter.ToString(rleReader.ReadBytes((int)rleReader.BaseStream.Length)).Replace('-', ' '));
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
+                        for (int i = 0; i < 256; i++)
+                        {
+                            var labelLen = rleReader.ReadByte();
+                            if(labelLen > 24) throw new IndexOutOfRangeException(string.Format("Label {0} tried to be longer than 24 characters!", i));
+                            city.labels[i] = Encoding.ASCII.GetString(rleReader.ReadBytes(labelLen));
+                            //Console.WriteLine("Label {0}: \"{1}\"", i, city.labels[i]); 
+                            rleReader.BaseStream.Seek(24-labelLen, SeekOrigin.Current);
+                        }
+                        //Console.WriteLine(BitConverter.ToString(rleReader.ReadBytes((int)rleReader.BaseStream.Length)).Replace('-', ' '));
+                    }
+                    break;
+                case "XBIT":
+                    using (var rleReader = new BinaryReaderBE(new MemoryStream(DecompressRLE(reader.ReadBytes(chunkLen)))))
+                    {
+                        Console.WriteLine("{0} decomp: {1}", chunkId, rleReader.BaseStream.Length);
+                        for (int y = 0; y < City.MAX_SIZE; y++)
+                        {
+                            for (int x = 0; x < City.MAX_SIZE; x++)
+                            {
+                                byte flags = rleReader.ReadByte();
+                                city.tiles[y][x].flags = (Tile.Flags)flags;
+                            }
+                        }
                     }
                     break;
                 default:
@@ -173,7 +201,7 @@ namespace sc2test
             return;
         }
 
-        public static byte[] unRLE(byte[] bytes)
+        public static byte[] DecompressRLE(byte[] bytes)
         {
             List<byte> newBytes = new List<byte>();
 

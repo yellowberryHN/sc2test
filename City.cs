@@ -14,6 +14,8 @@ namespace sc2test
 
         public int[] miscData = new int[1200];
 
+        public string[] labels = new string[256];
+
         public City()
         {
             tiles = new Tile[MAX_SIZE][];
